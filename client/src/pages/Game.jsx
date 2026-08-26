@@ -150,13 +150,14 @@ export default function Game() {
 
         <div className="game-scroll">
           <div className="game-inner">
-            <div className="card question-card">
+            <div className="card question-card" key={`qcard-${question.id}`}>
               <div className="question-eyebrow">Question {currentQuestionIndex + 1} of {totalQuestions}</div>
               <div className="question-text">{question.text}</div>
             </div>
 
             <div className="answers-grid">
               <AnswerCard
+                key={`mine-${question.id}`}
                 mine
                 name={players.you}
                 submitted={question.yourSubmitted}
@@ -165,6 +166,7 @@ export default function Game() {
                 onSubmit={submitAnswer}
               />
               <AnswerCard
+                key={`friend-${question.id}`}
                 mine={false}
                 name={players.friend}
                 submitted={question.friendSubmitted}
