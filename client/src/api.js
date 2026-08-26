@@ -53,6 +53,12 @@ export const api = {
   me: () => request('/auth/me'),
   updateDisplayName: (displayName) => request('/auth/me/display-name', { method: 'PATCH', body: { displayName } }),
   categories: () => request('/questions/categories', { auth: false }),
-  createRoom: (categories) => request('/rooms', { method: 'POST', body: { categories } }),
-  joinRoom: (code) => request(`/rooms/${encodeURIComponent(code)}/join`, { method: 'POST', body: {} })
+  createRoom: (categories, questionCount) => request('/rooms', { method: 'POST', body: { categories, questionCount } }),
+  joinRoom: (code) => request(`/rooms/${encodeURIComponent(code)}/join`, { method: 'POST', body: {} }),
+  inviteToRoom: (code, toUserId) => request(`/rooms/${encodeURIComponent(code)}/invite`, { method: 'POST', body: { toUserId } }),
+  searchUsers: (q) => request(`/users/search?q=${encodeURIComponent(q)}`),
+  friends: () => request('/friends'),
+  sendFriendRequest: (toUserId) => request('/friends/requests', { method: 'POST', body: { toUserId } }),
+  acceptFriendRequest: (id) => request(`/friends/requests/${encodeURIComponent(id)}/accept`, { method: 'POST' }),
+  declineFriendRequest: (id) => request(`/friends/requests/${encodeURIComponent(id)}/decline`, { method: 'POST' })
 };
