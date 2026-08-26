@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import * as users from '../db/users.js';
+import * as social from '../db/social.js';
 import { requireAuth, signToken } from './middleware.js';
 import * as roomManager from '../game/roomManager.js';
 
@@ -10,6 +11,12 @@ function activeRoomSummary(userId) {
   const room = roomManager.getActiveRoomForUser(userId);
   if (!room) return null;
   return { roomCode: room.roomCode, status: room.status };
+}
+
+function pendingInviteSummary(userId) {
+  const invite = roomManager.getInviteForUser(userId);
+  if (!invite) return null;
+  return { roomCode: invite.roomCode, fromName: invite.fromName };
 }
 
 router.post('/signup', async (req, res) => {
@@ -53,7 +60,12 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireAuth, (req, res) => {
   const user = users.findById(req.userId);
   if (!user) return res.status(401).json({ error: 'UNAUTHENTICATED', message: 'Please log in again.' });
-  res.json({ user: users.toPublicUser(user), activeRoom: activeRoomSummary(user.id) });
+  res.json({
+    user: users.toPublicUser(user),
+    activeRoom: activeRoomSummary(user.id),
+    pendingInvite: pendingInviteSummary(user.id),
+    pendingRequestCount: social.listIncomingRequests(user.id).length
+  });
 });
 
 router.patch('/me/display-name', requireAuth, (req, res) => {
