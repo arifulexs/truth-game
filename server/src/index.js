@@ -9,10 +9,12 @@ import { Server } from 'socket.io';
 
 import authRoutes from './auth/routes.js';
 import roomRoutes from './game/roomRoutes.js';
+import socialRoutes from './social/routes.js';
 import { verifyToken } from './auth/middleware.js';
 import * as users from './db/users.js';
 import * as roomManager from './game/roomManager.js';
 import { registerSocketHandlers } from './game/socketHandlers.js';
+import { initPresence } from './game/presence.js';
 
 if (!process.env.JWT_SECRET) {
   // Fine for local dev so the app "just works" out of the box; the README
@@ -32,6 +34,7 @@ app.use(express.json());
 
 app.use('/api/auth', authRoutes);
 app.use('/api', roomRoutes);
+app.use('/api', socialRoutes);
 
 app.get('/api/health', (_req, res) => res.json({ ok: true }));
 
@@ -49,6 +52,7 @@ const httpServer = createServer(app);
 const io = new Server(httpServer, {
   cors: { origin: CLIENT_URL, credentials: true }
 });
+initPresence(io);
 
 // Every socket connection must present a valid JWT — this is the same
 // auth used for REST calls, just passed via the handshake instead of a header.
