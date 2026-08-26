@@ -1,5 +1,5 @@
 import crypto from 'node:crypto';
-import { selectQuestions, QUESTIONS_PER_GAME, getQuestionText } from './questionBank.js';
+import { selectQuestions, QUESTIONS_PER_GAME, QUESTION_COUNT_OPTIONS, getQuestionText } from './questionBank.js';
 
 // Room codes avoid visually ambiguous characters (0/O, 1/I).
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -8,6 +8,7 @@ const ROOM_CODE_LENGTH = 5;
 const WAITING_TTL_MS = 15 * 60 * 1000; // room expires if player 2 never joins
 const INACTIVE_TTL_MS = 30 * 60 * 1000; // room expires after this much silence
 const COMPLETE_TTL_MS = 5 * 60 * 1000; // completed rooms are swept shortly after
+const INVITE_TTL_MS = WAITING_TTL_MS; // a direct invite shouldn't outlive the room it points to
 
 export class RoomError extends Error {
   constructor(code, message) {
@@ -22,6 +23,9 @@ const rooms = new Map();
 const codeToId = new Map();
 // userId -> roomId (lets a refreshed/reconnecting client find its way back in)
 const userActiveRoom = new Map();
+// toUserId -> { roomCode, roomId, fromUserId, fromName, createdAt } — a direct
+// game invite waiting to be seen, live (via socket) or on next session check.
+const pendingInvites = new Map();
 
 function generateRoomCode() {
   let code;
@@ -45,21 +49,23 @@ export function getActiveRoomForUser(userId) {
   return isRoomLive(room) ? room : null;
 }
 
-export function createRoom({ hostId, hostName, categories }) {
+export function createRoom({ hostId, hostName, categories, questionCount }) {
   if (!Array.isArray(categories) || categories.length === 0) {
     throw new RoomError('NO_CATEGORIES', 'Select at least one category to continue.');
   }
+
+  const count = QUESTION_COUNT_OPTIONS.includes(questionCount) ? questionCount : QUESTIONS_PER_GAME;
 
   const existing = getActiveRoomForUser(hostId);
   if (existing) {
     throw new RoomError('ALREADY_IN_ROOM', 'You already have an active game. Leave it before creating a new one.');
   }
 
-  const questionSequence = selectQuestions(categories, QUESTIONS_PER_GAME);
+  const questionSequence = selectQuestions(categories, count);
   if (!questionSequence) {
     throw new RoomError(
       'NOT_ENOUGH_QUESTIONS',
-      'Please select more categories. At least 20 unique questions are required.'
+      `Please select more categories. At least ${count} unique questions are required.`
     );
   }
 
@@ -112,6 +118,7 @@ export function joinRoom(rawCode, userId, userName) {
   room.players.player2.name = userName;
   room.lastActivityAt = Date.now();
   userActiveRoom.set(userId, room.roomId);
+  clearInviteForUser(userId); // whatever brought them here, it's resolved now
   return room;
 }
 
@@ -221,6 +228,41 @@ export function getStateForPlayer(room, userId) {
       : null,
     chatMessages: room.chatMessages
   };
+}
+
+/**
+ * Direct game invites — how a friend gets pulled straight into a specific
+ * room without ever seeing a room code. One pending invite per recipient at
+ * a time; sending a new one simply replaces whatever was there before.
+ */
+export function createInvite(room, fromUserId, fromName, toUserId) {
+  if (room.status !== 'waiting_for_player') {
+    throw new RoomError('INVALID_STATE', 'This room is no longer open for an invite.');
+  }
+  if (room.hostId !== fromUserId) {
+    throw new RoomError('FORBIDDEN', 'Only the host can invite someone to this room.');
+  }
+  if (toUserId === fromUserId) {
+    throw new RoomError('OWN_ROOM', "You can't invite yourself.");
+  }
+  const invite = { roomCode: room.roomCode, roomId: room.roomId, fromUserId, fromName, createdAt: Date.now() };
+  pendingInvites.set(toUserId, invite);
+  return invite;
+}
+
+export function getInviteForUser(userId) {
+  const invite = pendingInvites.get(userId);
+  if (!invite) return null;
+  const room = rooms.get(invite.roomId);
+  if (!room || room.status !== 'waiting_for_player' || Date.now() - invite.createdAt > INVITE_TTL_MS) {
+    pendingInvites.delete(userId);
+    return null;
+  }
+  return invite;
+}
+
+export function clearInviteForUser(userId) {
+  pendingInvites.delete(userId);
 }
 
 export function sweepExpiredRooms() {
