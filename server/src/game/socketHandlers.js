@@ -1,6 +1,7 @@
 import * as roomManager from './roomManager.js';
 import * as stateMachine from './stateMachine.js';
 import { RoomError } from './roomManager.js';
+import { registerSocket, unregisterSocket } from './presence.js';
 
 /** Sends each connected player their own privacy-safe view of the room. */
 function pushStateToRoom(io, room) {
@@ -19,6 +20,10 @@ function otherSlot(slot) {
 export function registerSocketHandlers(io, socket) {
   const userId = socket.data.userId;
   const userName = socket.data.displayName;
+
+  // Tracked independent of any room — this is what lets a friend request or
+  // game invite reach someone who's just sitting on Home, not in a game.
+  registerSocket(userId, socket.id);
 
   socket.on('join-room-socket', ({ roomCode } = {}, ack) => {
     const room = roomManager.getRoomByCode(roomCode);
@@ -101,6 +106,7 @@ export function registerSocketHandlers(io, socket) {
   });
 
   socket.on('disconnect', () => {
+    unregisterSocket(userId, socket.id);
     const room = socket.data.roomId && roomManager.getRoomById(socket.data.roomId);
     if (!room) return;
     const slot = roomManager.detachSocket(room, socket.id);
