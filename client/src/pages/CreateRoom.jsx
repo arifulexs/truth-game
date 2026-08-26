@@ -5,7 +5,7 @@ import { useToast } from '../context/ToastContext.jsx';
 import TopBar from '../components/TopBar.jsx';
 import HamburgerMenu from '../components/HamburgerMenu.jsx';
 
-const MIN_QUESTIONS = 20;
+const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20, 25];
 
 export default function CreateRoom() {
   const navigate = useNavigate();
@@ -14,6 +14,7 @@ export default function CreateRoom() {
 
   const [categories, setCategories] = useState([]);
   const [selected, setSelected] = useState([]);
+  const [questionCount, setQuestionCount] = useState(20);
   const [loadingCategories, setLoadingCategories] = useState(true);
   const [creating, setCreating] = useState(false);
   const [loadError, setLoadError] = useState('');
@@ -30,16 +31,14 @@ export default function CreateRoom() {
     setSelected((prev) => (prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key]));
   }
 
-  const availableCount = categories
-    .filter((c) => selected.includes(c.key))
-    .reduce((sum, c) => sum + c.count, 0);
-  const enoughQuestions = availableCount >= MIN_QUESTIONS;
+  const availableCount = categories.filter((c) => selected.includes(c.key)).reduce((sum, c) => sum + c.count, 0);
+  const enoughQuestions = availableCount >= questionCount;
 
   async function handleCreate() {
     if (selected.length === 0 || !enoughQuestions || creating) return;
     setCreating(true);
     try {
-      const room = await api.createRoom(selected);
+      const room = await api.createRoom(selected, questionCount);
       navigate(`/waiting/${room.roomCode}`);
     } catch (err) {
       toast.error(err.message || 'Could not create the room.');
@@ -55,7 +54,7 @@ export default function CreateRoom() {
         <div className="page-inner">
           <h1 style={{ fontSize: '1.5rem', marginBottom: 4 }}>Choose categories</h1>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            Pick one or more. You'll both get the same 20 questions, in the same order.
+            Pick one or more. You'll both get the same questions, in the same order.
           </p>
 
           {loadingCategories ? (
@@ -73,6 +72,23 @@ export default function CreateRoom() {
             </div>
           ) : (
             <>
+              <div className="field" style={{ marginTop: 18 }}>
+                <label>How many questions?</label>
+                <div className="count-picker">
+                  {QUESTION_COUNT_OPTIONS.map((n) => (
+                    <button
+                      key={n}
+                      type="button"
+                      className={`count-pill ${questionCount === n ? 'active' : ''}`}
+                      onClick={() => setQuestionCount(n)}
+                      aria-pressed={questionCount === n}
+                    >
+                      {n}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div className="category-grid">
                 {categories.map((c) => (
                   <button
@@ -102,7 +118,7 @@ export default function CreateRoom() {
 
               {selected.length > 0 && !enoughQuestions && (
                 <div className="form-error-banner">
-                  Please select more categories. At least {MIN_QUESTIONS} unique questions are required.
+                  Please select more categories. At least {questionCount} unique questions are required.
                 </div>
               )}
 
@@ -111,7 +127,7 @@ export default function CreateRoom() {
                 onClick={handleCreate}
                 disabled={selected.length === 0 || !enoughQuestions || creating}
               >
-                {creating ? <span className="inline-spinner" /> : 'Create room'}
+                {creating ? <span className="inline-spinner" /> : `Create room · ${questionCount} questions`}
               </button>
             </>
           )}
