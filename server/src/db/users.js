@@ -35,6 +35,15 @@ export function findById(id) {
   return readAll().users.find((u) => u.id === id) || null;
 }
 
+/** Case-insensitive substring match on display name, excluding the searcher themselves. */
+export function searchByDisplayName(query, excludeUserId, limit = 10) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return [];
+  return readAll()
+    .users.filter((u) => u.id !== excludeUserId && u.displayName.toLowerCase().includes(q))
+    .slice(0, limit);
+}
+
 export function createUser({ displayName, email, passwordHash }) {
   const data = readAll();
   const user = {
@@ -61,4 +70,10 @@ export function updateDisplayName(id, displayName) {
 export function toPublicUser(user) {
   if (!user) return null;
   return { id: user.id, displayName: user.displayName, email: user.email };
+}
+
+/** Slimmer than toPublicUser — for search results and friend lists, no email exposed. */
+export function toPeerSummary(user) {
+  if (!user) return null;
+  return { id: user.id, displayName: user.displayName };
 }
