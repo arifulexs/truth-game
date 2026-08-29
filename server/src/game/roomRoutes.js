@@ -4,6 +4,7 @@ import * as users from '../db/users.js';
 import * as social from '../db/social.js';
 import * as roomManager from '../game/roomManager.js';
 import { emitToUser } from './presence.js';
+import { maybeSendPush } from '../push/webpush.js';
 import { listCategories } from './questionBank.js';
 
 const router = Router();
@@ -12,9 +13,9 @@ router.get('/questions/categories', (_req, res) => {
   res.json({ categories: listCategories() });
 });
 
-router.post('/rooms', requireAuth, (req, res) => {
+router.post('/rooms', requireAuth, async (req, res) => {
   const { categories, questionCount } = req.body || {};
-  const user = users.findById(req.userId);
+  const user = await users.findById(req.userId);
   if (!user) return res.status(401).json({ error: 'UNAUTHENTICATED', message: 'Please log in again.' });
 
   try {
@@ -36,8 +37,8 @@ router.post('/rooms', requireAuth, (req, res) => {
   }
 });
 
-router.post('/rooms/:code/join', requireAuth, (req, res) => {
-  const user = users.findById(req.userId);
+router.post('/rooms/:code/join', requireAuth, async (req, res) => {
+  const user = await users.findById(req.userId);
   if (!user) return res.status(401).json({ error: 'UNAUTHENTICATED', message: 'Please log in again.' });
 
   try {
@@ -55,13 +56,13 @@ router.post('/rooms/:code/join', requireAuth, (req, res) => {
   }
 });
 
-router.post('/rooms/:code/invite', requireAuth, (req, res) => {
+router.post('/rooms/:code/invite', requireAuth, async (req, res) => {
   const { toUserId } = req.body || {};
-  const user = users.findById(req.userId);
-  const target = toUserId ? users.findById(toUserId) : null;
+  const user = await users.findById(req.userId);
+  const target = toUserId ? await users.findById(toUserId) : null;
   if (!user) return res.status(401).json({ error: 'UNAUTHENTICATED', message: 'Please log in again.' });
   if (!target) return res.status(404).json({ error: 'NOT_FOUND', message: "That person couldn't be found." });
-  if (!social.areFriends(user.id, target.id)) {
+  if (!(await social.areFriends(user.id, target.id))) {
     return res.status(403).json({ error: 'NOT_FRIENDS', message: 'You can only directly invite a friend.' });
   }
 
@@ -71,6 +72,12 @@ router.post('/rooms/:code/invite', requireAuth, (req, res) => {
   try {
     const invite = roomManager.createInvite(room, user.id, user.displayName, target.id);
     emitToUser(target.id, 'game-invite', { roomCode: invite.roomCode, fromName: invite.fromName });
+    await maybeSendPush(target.id, {
+      title: `${invite.fromName} invited you to a game`,
+      body: 'Tap to join directly — no code needed.',
+      tag: 'game-invite',
+      data: { roomCode: invite.roomCode }
+    });
     res.status(201).json({ ok: true });
   } catch (err) {
     const statusByCode = { INVALID_STATE: 409, FORBIDDEN: 403, OWN_ROOM: 400 };
