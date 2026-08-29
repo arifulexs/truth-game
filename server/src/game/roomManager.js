@@ -1,5 +1,6 @@
 import crypto from 'node:crypto';
 import { selectQuestions, QUESTIONS_PER_GAME, QUESTION_COUNT_OPTIONS, getQuestionText } from './questionBank.js';
+import { getBadgesForUserSync } from './badgeCache.js';
 
 // Room codes avoid visually ambiguous characters (0/O, 1/I).
 const ROOM_CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -169,6 +170,7 @@ export function addChatMessage(room, { senderId, senderSlot, senderName, message
     senderId,
     senderSlot,
     senderName,
+    senderBadges: getBadgesForUserSync(senderId),
     message,
     createdAt: Date.now()
   };
@@ -212,7 +214,9 @@ export function getStateForPlayer(room, userId) {
     totalQuestions: room.questionSequence.length,
     players: {
       you: room.players[slot].name,
+      youBadges: getBadgesForUserSync(room.players[slot].id),
       friend: room.players[otherSlot].name,
+      friendBadges: getBadgesForUserSync(room.players[otherSlot].id),
       friendConnected: room.players[otherSlot].connected
     },
     question: q
