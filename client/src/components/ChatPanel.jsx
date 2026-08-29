@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
+import BadgeRow from './Badge.jsx';
 
 const GROUP_WINDOW_MS = 3 * 60 * 1000; // messages this close together, same sender, don't repeat the name/time
 const NEAR_BOTTOM_PX = 80;
@@ -81,7 +82,12 @@ export default function ChatPanel({ messages, youSlot, onSend, disabled }) {
               const grouped = isGrouped(m, messages[i - 1]);
               return (
                 <div key={m.id} className={`chat-bubble-row ${mine ? 'mine' : 'theirs'} ${grouped ? 'grouped' : ''}`}>
-                  {!grouped && <span className="chat-sender">{mine ? 'You' : m.senderName}</span>}
+                  {!grouped && (
+                    <span className="chat-sender">
+                      {mine ? 'You' : m.senderName}
+                      <BadgeRow badges={m.senderBadges} />
+                    </span>
+                  )}
                   <div className="chat-bubble">{m.message}</div>
                   {!grouped && <span className="chat-timestamp">{formatTime(m.createdAt)}</span>}
                 </div>
