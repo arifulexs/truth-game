@@ -160,6 +160,7 @@ export default function Game() {
                 key={`mine-${question.id}`}
                 mine
                 name={players.you}
+                badges={players.youBadges}
                 submitted={question.yourSubmitted}
                 answerText={question.yourAnswer}
                 revealed={question.revealed}
@@ -169,6 +170,7 @@ export default function Game() {
                 key={`friend-${question.id}`}
                 mine={false}
                 name={players.friend}
+                badges={players.friendBadges}
                 submitted={question.friendSubmitted}
                 answerText={question.friendAnswer}
                 revealed={question.revealed}
