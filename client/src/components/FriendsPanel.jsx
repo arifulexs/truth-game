@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { api } from '../api.js';
 import { useToast } from '../context/ToastContext.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
+import { getSocket } from '../socket.js';
+import BadgeRow from './Badge.jsx';
 
 export default function FriendsPanel({ open, onClose }) {
   const toast = useToast();
@@ -14,6 +16,7 @@ export default function FriendsPanel({ open, onClose }) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [searching, setSearching] = useState(false);
+  const [confirmRemoveId, setConfirmRemoveId] = useState(null);
   const debounceRef = useRef(null);
 
   const loadFriends = useCallback(async () => {
@@ -35,6 +38,25 @@ export default function FriendsPanel({ open, onClose }) {
     loadFriends();
     clearRequestBadge();
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
+  // Live online/offline updates while the panel is open — the initial list
+  // load already has an accurate snapshot, this just keeps it current.
+  useEffect(() => {
+    if (!open) return undefined;
+    const socket = getSocket();
+    const onPresence = ({ userId, online }) => {
+      setFriends((prev) => prev.map((f) => (f.id === userId ? { ...f, online } : f)));
+    };
+    const onRemoved = ({ by }) => {
+      setFriends((prev) => prev.filter((f) => f.id !== by));
+    };
+    socket.on('friend-presence-changed', onPresence);
+    socket.on('friend-removed', onRemoved);
+    return () => {
+      socket.off('friend-presence-changed', onPresence);
+      socket.off('friend-removed', onRemoved);
+    };
   }, [open]);
 
   useEffect(() => {
@@ -93,6 +115,22 @@ export default function FriendsPanel({ open, onClose }) {
     }
   }
 
+  async function removeFriend(userId) {
+    if (confirmRemoveId !== userId) {
+      setConfirmRemoveId(userId);
+      setTimeout(() => setConfirmRemoveId((curr) => (curr === userId ? null : curr)), 3000);
+      return;
+    }
+    setConfirmRemoveId(null);
+    try {
+      await api.removeFriend(userId);
+      setFriends((prev) => prev.filter((f) => f.id !== userId));
+      toast.show('Friend removed');
+    } catch (err) {
+      toast.error(err.message || 'Could not remove that friend.');
+    }
+  }
+
   if (!open) return null;
 
   return (
@@ -130,7 +168,14 @@ export default function FriendsPanel({ open, onClose }) {
             ) : (
               friends.map((f) => (
                 <div key={f.id} className="friend-row">
-                  <span className="friend-name">{f.displayName}</span>
+                  <span className="friend-name">
+                    <span className={`online-dot ${f.online ? 'online' : ''}`} aria-label={f.online ? 'Online' : 'Offline'} />
+                    {f.displayName}
+                    <BadgeRow badges={f.badges} />
+                  </span>
+                  <button className="btn btn-ghost btn-sm" onClick={() => removeFriend(f.id)}>
+                    {confirmRemoveId === f.id ? 'Confirm?' : 'Remove'}
+                  </button>
                 </div>
               ))
             )
@@ -173,7 +218,10 @@ export default function FriendsPanel({ open, onClose }) {
               )}
               {results.map((r) => (
                 <div key={r.id} className="friend-row">
-                  <span className="friend-name">{r.displayName}</span>
+                  <span className="friend-name">
+                    {r.displayName}
+                    <BadgeRow badges={r.badges} />
+                  </span>
                   {r.status === 'friends' ? (
                     <span className="friend-status-pill">Friends</span>
                   ) : r.status === 'pending_outgoing' ? (
