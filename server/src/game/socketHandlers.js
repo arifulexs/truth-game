@@ -1,7 +1,8 @@
 import * as roomManager from './roomManager.js';
 import * as stateMachine from './stateMachine.js';
 import { RoomError } from './roomManager.js';
-import { registerSocket, unregisterSocket } from './presence.js';
+import * as social from '../db/social.js';
+import { registerSocket, unregisterSocket, emitToUser, isOnline } from './presence.js';
 
 /** Sends each connected player their own privacy-safe view of the room. */
 function pushStateToRoom(io, room) {
@@ -13,16 +14,26 @@ function pushStateToRoom(io, room) {
   }
 }
 
-function otherSlot(slot) {
-  return slot === 'player1' ? 'player2' : 'player1';
+/** Fire-and-forget: tells every friend of userId that their online status changed. */
+async function broadcastPresenceToFriends(userId, online) {
+  try {
+    const friendIds = await social.listFriendIds(userId);
+    for (const friendId of friendIds) {
+      emitToUser(friendId, 'friend-presence-changed', { userId, online });
+    }
+  } catch (err) {
+    console.error('[presence] failed to notify friends:', err.message);
+  }
 }
 
 export function registerSocketHandlers(io, socket) {
   const userId = socket.data.userId;
   const userName = socket.data.displayName;
 
-  // Tracked independent of any room — this is what lets a friend request or
-  // game invite reach someone who's just sitting on Home, not in a game.
+  // Only the transition from 0 -> 1 connections (or 1 -> 0) is a real
+  // online/offline change — someone with the app open in two tabs shouldn't
+  // flicker their friends' online dots on and off.
+  const wasOnline = isOnline(userId);
   registerSocket(userId, socket.id);
 
   socket.on('join-room-socket', ({ roomCode } = {}, ack) => {
@@ -107,6 +118,8 @@ export function registerSocketHandlers(io, socket) {
 
   socket.on('disconnect', () => {
     unregisterSocket(userId, socket.id);
+    if (!isOnline(userId)) broadcastPresenceToFriends(userId, false);
+
     const room = socket.data.roomId && roomManager.getRoomById(socket.data.roomId);
     if (!room) return;
     const slot = roomManager.detachSocket(room, socket.id);
@@ -114,4 +127,6 @@ export function registerSocketHandlers(io, socket) {
       socket.to(`room:${room.roomId}`).emit('opponent-connection-changed', { connected: false });
     }
   });
+
+  if (!wasOnline) broadcastPresenceToFriends(userId, true);
 }
