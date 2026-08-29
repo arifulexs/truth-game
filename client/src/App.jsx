@@ -12,6 +12,7 @@ import JoinRoom from './pages/JoinRoom.jsx';
 import Waiting from './pages/Waiting.jsx';
 import Game from './pages/Game.jsx';
 import Complete from './pages/Complete.jsx';
+import Admin from './pages/Admin.jsx';
 
 export default function App() {
   return (
@@ -67,6 +68,14 @@ export default function App() {
                 element={
                   <RequireAuth>
                     <Complete />
+                  </RequireAuth>
+                }
+              />
+              <Route
+                path="/admin"
+                element={
+                  <RequireAuth>
+                    <Admin />
                   </RequireAuth>
                 }
               />
