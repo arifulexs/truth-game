@@ -729,3 +729,54 @@ a { color: inherit; }
   100% { box-shadow: 0 0 0 14px rgba(214, 51, 108, 0); }
 }
 .next-question-row .btn-primary { animation: nextPulse 1.1s ease-out 1; }
+
+/* ==========================================================================
+   Badges — small, colorful, optionally animated icons next to a name
+   ========================================================================== */
+
+.badge-row { display: inline-flex; gap: 3px; margin-left: 6px; vertical-align: middle; }
+.user-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  font-size: 0.95em; line-height: 1; cursor: default;
+}
+.user-badge-animated { animation: badgeGlow 2.2s ease-in-out infinite; }
+@keyframes badgeGlow {
+  0%, 100% { filter: drop-shadow(0 0 1px var(--badge-color)); transform: scale(1); }
+  50% { filter: drop-shadow(0 0 5px var(--badge-color)); transform: scale(1.18); }
+}
+
+/* ==========================================================================
+   Online indicator dot (Friends list)
+   ========================================================================== */
+
+.online-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: var(--border-strong); margin-right: 8px; flex-shrink: 0;
+}
+.online-dot.online { background: var(--success); box-shadow: 0 0 0 3px color-mix(in srgb, var(--success) 25%, transparent); }
+
+/* ==========================================================================
+   Notification toggle switch (hamburger menu)
+   ========================================================================== */
+
+.toggle-switch {
+  display: inline-block; width: 38px; height: 22px; border-radius: var(--radius-full);
+  background: var(--border-strong); position: relative; transition: background-color 0.2s ease; flex-shrink: 0;
+}
+.toggle-switch::after {
+  content: ''; position: absolute; top: 2px; left: 2px; width: 18px; height: 18px; border-radius: 50%;
+  background: #fff; box-shadow: var(--shadow-sm); transition: transform 0.2s ease;
+}
+.toggle-switch.active { background: var(--success); }
+.toggle-switch.active::after { transform: translateX(16px); }
+
+/* ==========================================================================
+   Admin — badge assignment chips
+   ========================================================================== */
+
+.badge-toggle-chip {
+  border: 1.5px solid var(--border); background: var(--bg-elevated); border-radius: var(--radius-full);
+  padding: 6px 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+.badge-toggle-chip.active { border-color: var(--you); background: var(--you-soft); color: var(--you); }
