@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import BadgeRow from './Badge.jsx';
 
-export default function AnswerCard({ mine, name, submitted, answerText, revealed, onSubmit, disabled }) {
+export default function AnswerCard({ mine, name, badges, submitted, answerText, revealed, onSubmit, disabled }) {
   const [draft, setDraft] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -25,6 +26,7 @@ export default function AnswerCard({ mine, name, submitted, answerText, revealed
           <div className={`answer-owner ${tagClass}`}>
             <span className="swatch" />
             {tagLabel}
+            <BadgeRow badges={badges} />
           </div>
 
           {mine ? (
@@ -78,6 +80,7 @@ export default function AnswerCard({ mine, name, submitted, answerText, revealed
           <div className={`answer-owner ${tagClass}`}>
             <span className="swatch" />
             {tagLabel}
+            <BadgeRow badges={badges} />
           </div>
           <div className="answer-revealed-text">{answerText}</div>
         </div>
