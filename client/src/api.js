@@ -60,5 +60,29 @@ export const api = {
   friends: () => request('/friends'),
   sendFriendRequest: (toUserId) => request('/friends/requests', { method: 'POST', body: { toUserId } }),
   acceptFriendRequest: (id) => request(`/friends/requests/${encodeURIComponent(id)}/accept`, { method: 'POST' }),
-  declineFriendRequest: (id) => request(`/friends/requests/${encodeURIComponent(id)}/decline`, { method: 'POST' })
+  declineFriendRequest: (id) => request(`/friends/requests/${encodeURIComponent(id)}/decline`, { method: 'POST' }),
+  removeFriend: (userId) => request(`/friends/${encodeURIComponent(userId)}`, { method: 'DELETE' }),
+
+  // Push notifications
+  vapidPublicKey: () => request('/push/vapid-public-key', { auth: false }),
+  subscribePush: (subscription) => request('/push/subscribe', { method: 'POST', body: { subscription } }),
+  unsubscribePush: (endpoint) => request('/push/unsubscribe', { method: 'POST', body: { endpoint } }),
+
+  // Admin — question bank
+  adminCategories: () => request('/admin/categories'),
+  adminCreateCategory: (label, description) => request('/admin/categories', { method: 'POST', body: { label, description } }),
+  adminUpdateCategory: (key, label, description) => request(`/admin/categories/${encodeURIComponent(key)}`, { method: 'PATCH', body: { label, description } }),
+  adminDeleteCategory: (key) => request(`/admin/categories/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+  adminQuestionsForCategory: (key) => request(`/admin/categories/${encodeURIComponent(key)}/questions`),
+  adminCreateQuestion: (categoryKey, text) => request('/admin/questions', { method: 'POST', body: { categoryKey, text } }),
+  adminUpdateQuestion: (id, text) => request(`/admin/questions/${encodeURIComponent(id)}`, { method: 'PATCH', body: { text } }),
+  adminDeleteQuestion: (id) => request(`/admin/questions/${encodeURIComponent(id)}`, { method: 'DELETE' }),
+
+  // Admin — badges
+  adminBadges: () => request('/admin/badges'),
+  adminCreateBadge: (label, emoji, color, animated) => request('/admin/badges', { method: 'POST', body: { label, emoji, color, animated } }),
+  adminDeleteBadge: (key) => request(`/admin/badges/${encodeURIComponent(key)}`, { method: 'DELETE' }),
+  adminSearchUsers: (q) => request(`/admin/users/search?q=${encodeURIComponent(q)}`),
+  adminAssignBadge: (userId, badgeKey) => request(`/admin/users/${encodeURIComponent(userId)}/badges`, { method: 'POST', body: { badgeKey } }),
+  adminRemoveBadge: (userId, badgeKey) => request(`/admin/users/${encodeURIComponent(userId)}/badges/${encodeURIComponent(badgeKey)}`, { method: 'DELETE' })
 };
