@@ -9,15 +9,19 @@
     "start": "node src/index.js",
     "test:sync": "node test/simulate.js",
     "test:session": "node test/simulate-session.js",
-    "test": "npm run test:sync && npm run test:session"
+    "test:social": "node test/simulate-social.js",
+    "test:admin": "node test/simulate-admin.js",
+    "test": "npm run test:sync && npm run test:session && npm run test:social"
   },
   "dependencies": {
+    "@libsql/client": "^0.17.4",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.19.2",
     "jsonwebtoken": "^9.0.2",
-    "socket.io": "^4.7.5"
+    "socket.io": "^4.7.5",
+    "web-push": "^3.6.7"
   },
   "devDependencies": {
     "socket.io-client": "^4.7.5"
