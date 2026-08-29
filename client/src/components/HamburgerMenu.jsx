@@ -1,9 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext.jsx';
 import { useTheme } from '../context/ThemeContext.jsx';
 import { useToast } from '../context/ToastContext.jsx';
+import { enablePushNotifications, disablePushNotifications, getCurrentSubscription, getNotificationPermission, isPushSupported } from '../push.js';
 import FriendsPanel from './FriendsPanel.jsx';
+import BadgeRow from './Badge.jsx';
 
 const INFO_PANELS = {
   about: {
@@ -59,6 +61,47 @@ export default function HamburgerMenu({ open, onClose, inGame, onRequestLeaveGam
   // this component stays mounted across pages, only its drawer is toggled.
   const [friendsOpen, setFriendsOpen] = useState(false);
 
+  const [pushStatus, setPushStatus] = useState('checking'); // checking | unsupported | off | on | loading
+
+  useEffect(() => {
+    if (!open) return;
+    if (!isPushSupported()) {
+      setPushStatus('unsupported');
+      return;
+    }
+    if (getNotificationPermission() === 'denied') {
+      setPushStatus('denied');
+      return;
+    }
+    getCurrentSubscription()
+      .then((sub) => setPushStatus(sub ? 'on' : 'off'))
+      .catch(() => setPushStatus('off'));
+  }, [open]);
+
+  async function togglePush() {
+    if (pushStatus === 'on') {
+      setPushStatus('loading');
+      try {
+        await disablePushNotifications();
+        setPushStatus('off');
+        toast.show('Notifications turned off');
+      } catch (err) {
+        toast.error(err.message || 'Could not turn off notifications.');
+        setPushStatus('on');
+      }
+      return;
+    }
+    setPushStatus('loading');
+    try {
+      await enablePushNotifications();
+      setPushStatus('on');
+      toast.success('Notifications enabled');
+    } catch (err) {
+      toast.error(err.message || 'Could not enable notifications.');
+      setPushStatus(getNotificationPermission() === 'denied' ? 'denied' : 'off');
+    }
+  }
+
   async function saveName() {
     if (!nameDraft.trim()) return;
     setSavingName(true);
@@ -82,6 +125,11 @@ export default function HamburgerMenu({ open, onClose, inGame, onRequestLeaveGam
   function openFriends() {
     onClose();
     setFriendsOpen(true);
+  }
+
+  function goToAdmin() {
+    onClose();
+    navigate('/admin');
   }
 
   return (
@@ -120,7 +168,10 @@ export default function HamburgerMenu({ open, onClose, inGame, onRequestLeaveGam
                     setEditingName(true);
                   }}
                 >
-                  <span>{user?.displayName}</span>
+                  <span>
+                    {user?.displayName}
+                    <BadgeRow badges={user?.badges} />
+                  </span>
                   <span style={{ color: 'var(--text-muted)', fontSize: '0.8rem' }}>Edit</span>
                 </button>
               )}
@@ -149,6 +200,24 @@ export default function HamburgerMenu({ open, onClose, inGame, onRequestLeaveGam
               </div>
             </div>
 
+            <div className="drawer-section">
+              <div className="drawer-section-title">Notifications</div>
+              {pushStatus === 'unsupported' ? (
+                <p className="info-panel-text">Not supported in this browser.</p>
+              ) : pushStatus === 'denied' ? (
+                <p className="info-panel-text">Blocked — enable notifications for this site in your browser settings.</p>
+              ) : (
+                <button className="drawer-row" onClick={togglePush} disabled={pushStatus === 'loading' || pushStatus === 'checking'}>
+                  <span>Game invites &amp; friend requests</span>
+                  {pushStatus === 'loading' || pushStatus === 'checking' ? (
+                    <span className="inline-spinner" style={{ width: 16, height: 16 }} />
+                  ) : (
+                    <span className={`toggle-switch ${pushStatus === 'on' ? 'active' : ''}`} />
+                  )}
+                </button>
+              )}
+            </div>
+
             {inGame && (
               <div className="drawer-section">
                 <div className="drawer-section-title">Game</div>
@@ -161,6 +230,16 @@ export default function HamburgerMenu({ open, onClose, inGame, onRequestLeaveGam
                 >
                   <span>Leave game</span>
                   <span>→</span>
+                </button>
+              </div>
+            )}
+
+            {user?.isAdmin && (
+              <div className="drawer-section">
+                <div className="drawer-section-title">Admin</div>
+                <button className="drawer-row" onClick={goToAdmin}>
+                  <span>Manage questions &amp; badges</span>
+                  <span className="drawer-chevron">→</span>
                 </button>
               </div>
             )}
