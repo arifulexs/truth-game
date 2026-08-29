@@ -1,41 +1,39 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { fileURLToPath } from 'node:url';
-
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_PATH = path.join(__dirname, '..', 'questions', 'questions.json');
-
-const raw = JSON.parse(fs.readFileSync(DATA_PATH, 'utf-8'));
-
-// Flat lookup: questionId -> { id, question, category }
-const byId = new Map();
-// categoryKey -> array of question ids
-const idsByCategory = new Map();
-
-for (const [categoryKey, category] of Object.entries(raw.categories)) {
-  const ids = [];
-  for (const q of category.questions) {
-    byId.set(q.id, { ...q, category: categoryKey });
-    ids.push(q.id);
-  }
-  idsByCategory.set(categoryKey, ids);
-}
+import { getAllQuestionsFlat, listCategoriesWithCounts } from '../db/questions.js';
 
 export const QUESTIONS_PER_GAME = 20;
 export const QUESTION_COUNT_OPTIONS = [5, 10, 15, 20, 25];
 
+// In-memory cache, read synchronously by gameplay code (room creation
+// shouldn't need a database round-trip). The database is the source of
+// truth; this is refreshed on boot and whenever the admin site changes
+// anything, via refreshQuestionCache().
+let byId = new Map();
+let idsByCategory = new Map();
+let categoryMeta = [];
+
+export async function refreshQuestionCache() {
+  const [flatQuestions, categories] = await Promise.all([getAllQuestionsFlat(), listCategoriesWithCounts()]);
+
+  const nextById = new Map();
+  const nextIdsByCategory = new Map();
+  for (const q of flatQuestions) {
+    nextById.set(q.id, q);
+    if (!nextIdsByCategory.has(q.category)) nextIdsByCategory.set(q.category, []);
+    nextIdsByCategory.get(q.category).push(q.id);
+  }
+
+  byId = nextById;
+  idsByCategory = nextIdsByCategory;
+  categoryMeta = categories;
+}
+
 /**
- * Returns the list of categories available, with a live count of questions
- * in each — used by the Create Room screen so new categories added to
- * questions.json show up automatically without any frontend changes.
+ * Categories available, with a live count of questions in each — read by
+ * the Create Room screen. Backed by the cache, so this stays fast even
+ * though the underlying data lives in the database.
  */
 export function listCategories() {
-  return Object.entries(raw.categories).map(([key, category]) => ({
-    key,
-    label: category.label,
-    description: category.description || '',
-    count: category.questions.length
-  }));
+  return categoryMeta;
 }
 
 function shuffle(array) {
