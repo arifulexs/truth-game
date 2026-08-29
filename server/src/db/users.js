@@ -1,75 +1,64 @@
-import fs from 'node:fs';
-import path from 'node:path';
 import crypto from 'node:crypto';
-import { fileURLToPath } from 'node:url';
+import { db } from './client.js';
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const DATA_DIR = path.join(__dirname, '..', '..', 'data');
-const DATA_FILE = path.join(DATA_DIR, 'users.json');
-
-function ensureStore() {
-  if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
-  if (!fs.existsSync(DATA_FILE)) fs.writeFileSync(DATA_FILE, JSON.stringify({ users: [] }, null, 2));
+function rowToUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    displayName: row.display_name,
+    email: row.email,
+    passwordHash: row.password_hash,
+    isAdmin: Number(row.is_admin) === 1,
+    createdAt: Number(row.created_at)
+  };
 }
 
-function readAll() {
-  ensureStore();
-  const raw = fs.readFileSync(DATA_FILE, 'utf-8');
-  try {
-    return JSON.parse(raw);
-  } catch {
-    return { users: [] };
-  }
-}
-
-function writeAll(data) {
-  fs.writeFileSync(DATA_FILE, JSON.stringify(data, null, 2));
-}
-
-export function findByEmail(email) {
+export async function findByEmail(email) {
   const normalized = (email || '').trim().toLowerCase();
-  return readAll().users.find((u) => u.email === normalized) || null;
+  const { rows } = await db.execute({ sql: 'SELECT * FROM users WHERE email = ?', args: [normalized] });
+  return rowToUser(rows[0]);
 }
 
-export function findById(id) {
-  return readAll().users.find((u) => u.id === id) || null;
+export async function findById(id) {
+  const { rows } = await db.execute({ sql: 'SELECT * FROM users WHERE id = ?', args: [id] });
+  return rowToUser(rows[0]);
 }
 
 /** Case-insensitive substring match on display name, excluding the searcher themselves. */
-export function searchByDisplayName(query, excludeUserId, limit = 10) {
-  const q = (query || '').trim().toLowerCase();
+export async function searchByDisplayName(query, excludeUserId, limit = 10) {
+  const q = (query || '').trim();
   if (!q) return [];
-  return readAll()
-    .users.filter((u) => u.id !== excludeUserId && u.displayName.toLowerCase().includes(q))
-    .slice(0, limit);
+  const { rows } = await db.execute({
+    sql: 'SELECT * FROM users WHERE id != ? AND display_name LIKE ? COLLATE NOCASE LIMIT ?',
+    args: [excludeUserId, `%${q}%`, limit]
+  });
+  return rows.map(rowToUser);
 }
 
-export function createUser({ displayName, email, passwordHash }) {
-  const data = readAll();
+export async function createUser({ displayName, email, passwordHash, isAdmin = false }) {
   const user = {
     id: crypto.randomUUID(),
     displayName: displayName.trim(),
     email: email.trim().toLowerCase(),
     passwordHash,
+    isAdmin,
     createdAt: Date.now()
   };
-  data.users.push(user);
-  writeAll(data);
+  await db.execute({
+    sql: 'INSERT INTO users (id, display_name, email, password_hash, is_admin, created_at) VALUES (?, ?, ?, ?, ?, ?)',
+    args: [user.id, user.displayName, user.email, user.passwordHash, user.isAdmin ? 1 : 0, user.createdAt]
+  });
   return user;
 }
 
-export function updateDisplayName(id, displayName) {
-  const data = readAll();
-  const user = data.users.find((u) => u.id === id);
-  if (!user) return null;
-  user.displayName = displayName.trim();
-  writeAll(data);
-  return user;
+export async function updateDisplayName(id, displayName) {
+  await db.execute({ sql: 'UPDATE users SET display_name = ? WHERE id = ?', args: [displayName.trim(), id] });
+  return findById(id);
 }
 
 export function toPublicUser(user) {
   if (!user) return null;
-  return { id: user.id, displayName: user.displayName, email: user.email };
+  return { id: user.id, displayName: user.displayName, email: user.email, isAdmin: user.isAdmin };
 }
 
 /** Slimmer than toPublicUser — for search results and friend lists, no email exposed. */
